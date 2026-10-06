@@ -1,0 +1,13 @@
+/target
+**/*.rs.bk
+.idea/
+.vscode/
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.next/
+coverage/
+*.log

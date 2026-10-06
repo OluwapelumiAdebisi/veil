@@ -1,0 +1,20 @@
+[package]
+name = "veil-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Commitments, bid tags, and toy eligibility proofs for Veil"
+
+[dependencies]
+blake3 = { workspace = true }
+curve25519-dalek-ng = { workspace = true }
+bulletproofs = { workspace = true }
+merlin = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+rand = { workspace = true }
+serde_json = "1.0"

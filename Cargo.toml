@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["crates/veil-crypto"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+version = "0.1.0"
+
+[workspace.dependencies]
+blake3 = "1.5"
+curve25519-dalek-ng = "4.1"
+bulletproofs = "4.0"
+merlin = "3.0"
+hmac = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
