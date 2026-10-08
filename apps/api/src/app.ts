@@ -1,15 +1,64 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { cors } from "hono/cors";
 import { findForbiddenKeys } from "./invariant.ts";
 import { MemoryStore } from "./store.ts";
-import { accumulatorRoot, argmaxBids, verifyProof } from "./crypto.ts";
+import { accumulatorRoot, argmaxBids, proveLocal, splitBid, verifyProof } from "./crypto.ts";
 import type { BidShare, CreateAuctionBody, EligibilityProof } from "./types.ts";
 import { systemClock, type Clock } from "./clock.ts";
 
 export function createApp(store = new MemoryStore(), clock: Clock = systemClock) {
   const app = new Hono();
+  app.use("*", cors());
 
   app.get("/health", (c) => c.json({ ok: true }));
+
+  app.post("/demo/reset", (c) => {
+    store.reset();
+    return c.json({ ok: true });
+  });
+
+  app.get("/auctions", (c) =>
+    c.json(
+      store
+        .listAuctions()
+        .map((auction) => ({
+          ...auction,
+          sealedBidCount: store.listBids(auction.auctionId).length,
+        }))
+        .reverse(),
+    ),
+  );
+
+  app.post("/prover/prove", async (c) => {
+    const body = await readJson(c);
+    if (!body.ok) {
+      return body.response;
+    }
+    try {
+      const result = await proveLocal(body.value);
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : "prove failed" }, 400);
+    }
+  });
+
+  app.post("/prover/split", async (c) => {
+    const body = await readJson(c);
+    if (!body.ok) {
+      return body.response;
+    }
+    const input = body.value as { auction_id?: string; bid_amount?: number; bid_nonce?: string };
+    if (!input.auction_id || input.bid_amount == null || !input.bid_nonce) {
+      return c.json({ error: "auction_id, bid_amount, and bid_nonce are required" }, 400);
+    }
+    try {
+      const shares = await splitBid(input.auction_id, input.bid_amount, input.bid_nonce);
+      return c.json({ shares });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : "split failed" }, 400);
+    }
+  });
 
   app.get("/indexer", async (c) => {
     const acc = await accumulatorRoot(store.observed);
@@ -51,6 +100,8 @@ export function createApp(store = new MemoryStore(), clock: Clock = systemClock)
     const auction = {
       auctionId,
       seller: input.seller,
+      title: input.title?.trim() || undefined,
+      description: input.description?.trim() || undefined,
       minimumBid: input.minimumBid,
       bondAmount: input.bondAmount,
       startTime: input.startTime ?? now,
@@ -69,7 +120,10 @@ export function createApp(store = new MemoryStore(), clock: Clock = systemClock)
     if (!auction) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(auction);
+    return c.json({
+      ...auction,
+      bids: store.listBids(auction.auctionId).map(publicBid),
+    });
   });
 
   app.post("/auctions/:id/bids", async (c) => {

@@ -15,6 +15,10 @@ export class MemoryStore {
     return this.auctions.get(id);
   }
 
+  listAuctions() {
+    return [...this.auctions.values()];
+  }
+
   addBid(bid: StoredBid) {
     const list = this.bids.get(bid.auctionId) ?? [];
     list.push(bid);
@@ -46,5 +50,13 @@ export class MemoryStore {
 
   getShare(nodeId: number, bidId: string) {
     return this.committee[nodeId - 1].get(bidId);
+  }
+
+  reset() {
+    this.auctions.clear();
+    this.bids.clear();
+    this.tags.clear();
+    this.observed = [];
+    this.committee = [new Map(), new Map(), new Map()];
   }
 }

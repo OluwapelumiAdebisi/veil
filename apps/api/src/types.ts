@@ -51,6 +51,8 @@ export type EligibilityProof = {
 export type Auction = {
   auctionId: string;
   seller: string;
+  title?: string;
+  description?: string;
   minimumBid: number;
   bondAmount: number;
   startTime: string;
@@ -87,6 +89,8 @@ export type BidShare = {
 export type CreateAuctionBody = {
   auctionId?: string;
   seller: string;
+  title?: string;
+  description?: string;
   minimumBid: number;
   bondAmount: number;
   startTime?: string;
