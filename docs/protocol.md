@@ -35,6 +35,7 @@ The circuit / toy proof must show:
 5. Commitment opens to the hidden bid
 6. Tag = PRF(nk, "VEIL-BID" || rho || auction_id)
 7. Fixed public bond condition
+8. Hidden toy nullifier is not in the published accumulator (interval + Merkle paths; adjacent public leaves are a V1 leak)
 
 ## Auction flow
 

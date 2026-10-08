@@ -8,13 +8,15 @@ This repository is the Zecathon V1 implementation of that protocol. Cryptography
 
 ## Current milestone
 
-1. `crates/veil-crypto` — hidden bid commitments, bid tags, and a toy eligibility proof.
-2. `apps/api` — coordinator that accepts proofs and **refuses** bid amounts, funding amounts, and wallet secrets.
+1. `crates/veil-crypto` — hidden bids, toy eligibility, and a nullifier accumulator.
+2. `crates/veil-mpc` — 2-of-3 Shamir shares and private argmax (winner id only).
+3. `apps/api` — close, reconfirm against a fresh root, committee shares, select-winner.
 
 ```bash
 source "$HOME/.cargo/env"
-cargo test -p veil-crypto
+cargo test
 cargo build -p veil-crypto --bin veil-crypto
+cargo build -p veil-mpc --bin veil-mpc
 cd apps/api && npm install && npm test
 ```
 

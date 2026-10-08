@@ -1,9 +1,11 @@
-import type { Auction, StoredBid } from "./types.ts";
+import type { Auction, BidShare, StoredBid } from "./types.ts";
 
 export class MemoryStore {
   auctions = new Map<string, Auction>();
   bids = new Map<string, StoredBid[]>();
   tags = new Set<string>();
+  observed: string[] = [];
+  committee = [new Map<string, BidShare>(), new Map<string, BidShare>(), new Map<string, BidShare>()];
 
   putAuction(auction: Auction) {
     this.auctions.set(auction.auctionId, auction);
@@ -20,11 +22,29 @@ export class MemoryStore {
     this.tags.add(`${bid.auctionId}:${bid.bidTag}`);
   }
 
+  getBid(auctionId: string, bidId: string) {
+    return this.listBids(auctionId).find((b) => b.bidId === bidId);
+  }
+
   listBids(auctionId: string) {
     return this.bids.get(auctionId) ?? [];
   }
 
   hasTag(auctionId: string, tag: string) {
     return this.tags.has(`${auctionId}:${tag}`);
+  }
+
+  addObserved(spent: string) {
+    if (!this.observed.includes(spent)) {
+      this.observed.push(spent);
+    }
+  }
+
+  putShare(nodeId: number, bidId: string, share: BidShare) {
+    this.committee[nodeId - 1].set(bidId, share);
+  }
+
+  getShare(nodeId: number, bidId: string) {
+    return this.committee[nodeId - 1].get(bidId);
   }
 }

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/veil-crypto"]
+members = ["crates/veil-crypto", "crates/veil-mpc"]
 
 [workspace.package]
 edition = "2021"

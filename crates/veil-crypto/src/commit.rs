@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub const DOMAIN_BID: &[u8] = b"VEIL-BID-V1";
 pub const DOMAIN_FUNDING: &[u8] = b"VEIL-FUNDING-V1";
+pub const DOMAIN_NF: &[u8] = b"VEIL-NF-V1";
 pub const NONCE_LEN: usize = 32;
 
 /// Public Pedersen commitment. The opening (value, blinding) stays private.
@@ -89,7 +90,11 @@ pub fn verify_funding_commitment(
     verify_commitment(DOMAIN_FUNDING, auction_id, funding, nonce, expected)
 }
 
-pub(crate) fn domain_blinding(domain: &[u8], auction_id: &str, nonce: &[u8; NONCE_LEN]) -> Scalar {
+pub fn bid_blinding(auction_id: &str, nonce: &[u8; NONCE_LEN]) -> Scalar {
+    domain_blinding(DOMAIN_BID, auction_id, nonce)
+}
+
+pub fn domain_blinding(domain: &[u8], auction_id: &str, nonce: &[u8; NONCE_LEN]) -> Scalar {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"VEIL-PEDERSEN-BLIND");
     hasher.update(&(domain.len() as u64).to_le_bytes());
