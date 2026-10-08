@@ -10,7 +10,12 @@ export type AuctionStatus =
   | "DEFAULTED"
   | "COMPLETED";
 
-export type BidStatus = "ACCEPTED" | "REJECTED" | "RECONFIRMED" | "EXCLUDED";
+export type BidStatus =
+  | "ACCEPTED"
+  | "REJECTED"
+  | "RECONFIRMED"
+  | "EXCLUDED"
+  | "DEFAULTED";
 
 export type Commitment = { compressed: string };
 
@@ -56,6 +61,9 @@ export type Auction = {
   nullifierRoot?: string;
   closeRoot?: string;
   winnerBidId?: string;
+  settlementDeadline?: string;
+  settlementTxid?: string;
+  defaultedBidIds?: string[];
 };
 
 export type StoredBid = {

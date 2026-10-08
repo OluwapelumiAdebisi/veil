@@ -41,7 +41,7 @@ The circuit / toy proof must show:
 
 `CREATED → OPEN → CLOSING → ELIGIBILITY_CHECK → MPC_WINNER_SELECTION → PROVISIONAL_WINNER → SETTLEMENT_WINDOW → SETTLED | DEFAULTED → NEXT_WINNER`
 
-First-price. Fixed bond (independent of bid). Close-time re-eligibility against a fresh nullifier root. Failed settlement forfeits the bond and reruns argmax.
+First-price. Fixed bond (independent of bid). Close-time re-eligibility against a fresh nullifier root. Settlement is a short window; a missed payment defaults the winner, forfeits the bond, and reruns argmax.
 
 ## Crypto crate (now)
 

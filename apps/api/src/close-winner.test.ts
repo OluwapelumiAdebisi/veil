@@ -146,7 +146,7 @@ test("close-time spend drops Bob and MPC outputs Charlie only", async () => {
   const winner = await json(app, "/auctions/A123/select-winner", { method: "POST" });
   assert.equal(winner.status, 200);
   assert.equal(winner.body.winnerBidId, placed.charlie.bidId);
-  assert.equal(winner.body.status, "PROVISIONAL_WINNER");
+  assert.equal(winner.body.status, "SETTLEMENT_WINDOW");
   const payload = JSON.stringify(winner.body);
   assert.equal(payload.includes("5000000"), false);
   assert.equal(payload.includes("7000000"), false);

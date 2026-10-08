@@ -4,8 +4,9 @@ import { findForbiddenKeys } from "./invariant.ts";
 import { MemoryStore } from "./store.ts";
 import { accumulatorRoot, argmaxBids, verifyProof } from "./crypto.ts";
 import type { BidShare, CreateAuctionBody, EligibilityProof } from "./types.ts";
+import { systemClock, type Clock } from "./clock.ts";
 
-export function createApp(store = new MemoryStore()) {
+export function createApp(store = new MemoryStore(), clock: Clock = systemClock) {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ ok: true }));
@@ -210,42 +211,124 @@ export function createApp(store = new MemoryStore()) {
     }
     auction.status = "MPC_WINNER_SELECTION";
     for (const bid of store.listBids(auction.auctionId)) {
-      if (bid.status !== "RECONFIRMED") {
+      if (bid.status === "ACCEPTED") {
         bid.status = "EXCLUDED";
       }
     }
-    const eligible = store.listBids(auction.auctionId).filter((b) => b.status === "RECONFIRMED");
-    if (!eligible.length) {
-      return c.json({ error: "no eligible bids" }, 409);
+    const assigned = await assignWinner(store, auction, clock);
+    if ("error" in assigned) {
+      return c.json({ error: assigned.error, bidId: assigned.bidId }, assigned.status);
     }
-    const mpcBids = [];
-    for (const bid of eligible) {
-      const s1 = store.getShare(1, bid.bidId);
-      const s2 = store.getShare(2, bid.bidId);
-      if (!s1 || !s2) {
-        return c.json({ error: "missing committee shares", bidId: bid.bidId }, 409);
-      }
-      mpcBids.push({
-        bid_id: bid.bidId,
-        bid_commitment: { compressed: bid.bidCommitment },
-        shares: [s1, s2],
-      });
+    return c.json(settlementView(auction));
+  });
+
+  app.post("/auctions/:id/settle", async (c) => {
+    const auction = store.getAuction(c.req.param("id"));
+    if (!auction) {
+      return c.json({ error: "not found" }, 404);
     }
-    let result: { winner_bid_id: string };
-    try {
-      result = await argmaxBids(mpcBids);
-    } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : "argmax failed" }, 400);
+    if (auction.status !== "SETTLEMENT_WINDOW") {
+      return c.json({ error: "auction is not in the settlement window" }, 409);
     }
-    auction.winnerBidId = result.winner_bid_id;
-    auction.status = "PROVISIONAL_WINNER";
+    if (auction.settlementDeadline && clock.now() > Date.parse(auction.settlementDeadline)) {
+      return c.json({ error: "settlement window expired" }, 409);
+    }
+    const body = await readJson(c);
+    if (!body.ok) {
+      return body.response;
+    }
+    const forbidden = findForbiddenKeys(body.value);
+    if (forbidden.length) {
+      return c.json({ error: "forbidden fields", fields: forbidden }, 400);
+    }
+    const txid = (body.value as { txid?: string }).txid;
+    if (!txid) {
+      return c.json({ error: "txid is required" }, 400);
+    }
+    auction.settlementTxid = txid;
+    auction.status = "SETTLED";
     return c.json({
-      winnerBidId: auction.winnerBidId,
       status: auction.status,
+      winnerBidId: auction.winnerBidId,
+      settlementTxid: txid,
     });
   });
 
+  app.post("/auctions/:id/default", async (c) => {
+    const auction = store.getAuction(c.req.param("id"));
+    if (!auction) {
+      return c.json({ error: "not found" }, 404);
+    }
+    if (auction.status !== "SETTLEMENT_WINDOW") {
+      return c.json({ error: "auction is not in the settlement window" }, 409);
+    }
+    if (!auction.settlementDeadline || clock.now() <= Date.parse(auction.settlementDeadline)) {
+      return c.json({ error: "settlement window is still open" }, 409);
+    }
+    const winner = auction.winnerBidId ? store.getBid(auction.auctionId, auction.winnerBidId) : undefined;
+    if (winner) {
+      winner.status = "DEFAULTED";
+      auction.defaultedBidIds = [...(auction.defaultedBidIds ?? []), winner.bidId];
+    }
+    auction.status = "DEFAULTED";
+    auction.settlementDeadline = undefined;
+    auction.winnerBidId = undefined;
+    const assigned = await assignWinner(store, auction, clock);
+    if ("error" in assigned) {
+      auction.status = "COMPLETED";
+      return c.json({
+        status: auction.status,
+        defaultedBidIds: auction.defaultedBidIds ?? [],
+        error: assigned.error,
+      });
+    }
+    return c.json(settlementView(auction));
+  });
+
   return app;
+}
+
+async function assignWinner(store: MemoryStore, auction: NonNullable<ReturnType<MemoryStore["getAuction"]>>, clock: Clock) {
+  const eligible = store
+    .listBids(auction.auctionId)
+    .filter((b) => b.status === "RECONFIRMED");
+  if (!eligible.length) {
+    return { error: "no eligible bids", status: 409 as const };
+  }
+  const mpcBids = [];
+  for (const bid of eligible) {
+    const s1 = store.getShare(1, bid.bidId);
+    const s2 = store.getShare(2, bid.bidId);
+    if (!s1 || !s2) {
+      return { error: "missing committee shares", bidId: bid.bidId, status: 409 as const };
+    }
+    mpcBids.push({
+      bid_id: bid.bidId,
+      bid_commitment: { compressed: bid.bidCommitment },
+      shares: [s1, s2],
+    });
+  }
+  let result: { winner_bid_id: string };
+  try {
+    result = await argmaxBids(mpcBids);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "argmax failed", status: 400 as const };
+  }
+  auction.winnerBidId = result.winner_bid_id;
+  auction.status = "SETTLEMENT_WINDOW";
+  auction.settlementDeadline = new Date(clock.now() + auction.settlementWindow * 1000).toISOString();
+  auction.settlementTxid = undefined;
+  return { ok: true as const };
+}
+
+function settlementView(auction: NonNullable<ReturnType<MemoryStore["getAuction"]>>) {
+  return {
+    winnerBidId: auction.winnerBidId,
+    status: auction.status,
+    settlementDeadline: auction.settlementDeadline,
+    settlementTxid: auction.settlementTxid,
+    defaultedBidIds: auction.defaultedBidIds ?? [],
+  };
 }
 
 async function acceptProof(

@@ -10,7 +10,7 @@ This repository is the Zecathon V1 implementation of that protocol. Cryptography
 
 1. `crates/veil-crypto` — hidden bids, toy eligibility, and a nullifier accumulator.
 2. `crates/veil-mpc` — 2-of-3 Shamir shares and private argmax (winner id only).
-3. `apps/api` — close, reconfirm against a fresh root, committee shares, select-winner.
+3. `apps/api` — close, reconfirm, private winner selection, settlement window, default / next winner.
 
 ```bash
 source "$HOME/.cargo/env"
