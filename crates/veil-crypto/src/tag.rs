@@ -9,7 +9,7 @@ type HmacSha256 = Hmac<Sha256>;
 pub const TAG_DST: &[u8] = b"VEIL-BID";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BidTag(pub [u8; 32]);
+pub struct BidTag(#[serde(with = "crate::hexutil::hex32_serde")] pub [u8; 32]);
 
 /// tag = PRF(nk, "VEIL-BID" || rho || auction_scope)
 pub fn derive_bid_tag(nk: &[u8; 32], rho: &[u8; 32], auction_scope: &str) -> BidTag {

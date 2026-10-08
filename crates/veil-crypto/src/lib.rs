@@ -6,6 +6,7 @@
 
 pub mod commit;
 pub mod error;
+pub mod hexutil;
 pub mod note;
 pub mod proof;
 pub mod tag;

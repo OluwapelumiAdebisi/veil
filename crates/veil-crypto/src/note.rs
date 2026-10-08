@@ -4,13 +4,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ToyNote {
     pub value: u64,
+    #[serde(with = "crate::hexutil::hex32_serde")]
     pub rho: [u8; 32],
+    #[serde(with = "crate::hexutil::hex32_serde")]
     pub nk: [u8; 32],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ToyNoteWitness {
     pub note: ToyNote,
+    #[serde(with = "crate::hexutil::hex32_serde")]
     pub commitment: [u8; 32],
 }
 

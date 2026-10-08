@@ -8,22 +8,23 @@ This repository is the Zecathon V1 implementation of that protocol. Cryptography
 
 ## Current milestone
 
-`crates/veil-crypto` — local bid commitments, bid tags, and a toy eligibility proof.
-
-The verifier sees public inputs and **VALID / INVALID**. It does not see the bid.
+1. `crates/veil-crypto` — hidden bid commitments, bid tags, and a toy eligibility proof.
+2. `apps/api` — coordinator that accepts proofs and **refuses** bid amounts, funding amounts, and wallet secrets.
 
 ```bash
 source "$HOME/.cargo/env"
 cargo test -p veil-crypto
+cargo build -p veil-crypto --bin veil-crypto
+cd apps/api && npm install && npm test
 ```
 
-Toy notes and Bulletproofs range proofs stand in for Orchard + Halo 2. That swap is the next crypto milestone.
+Toy notes and Bulletproofs stand in for Orchard + Halo 2.
 
 ## Layout
 
 ```
 veil/
-├── apps/            # Next.js web + Node API (later)
+├── apps/            # Node coordinator API; Next.js web later
 ├── crates/          # Rust crypto, zcash, mpc, prover
 ├── services/        # indexer + MPC committee (later)
 ├── database/

@@ -10,6 +10,7 @@ pub const NONCE_LEN: usize = 32;
 /// Public Pedersen commitment. The opening (value, blinding) stays private.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Commitment {
+    #[serde(with = "crate::hexutil::hex32_serde")]
     pub compressed: [u8; 32],
 }
 

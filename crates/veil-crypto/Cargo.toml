@@ -14,7 +14,11 @@ hmac = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
-
-[dev-dependencies]
+serde_json = { workspace = true }
+hex = { workspace = true }
+clap = { workspace = true }
 rand = { workspace = true }
-serde_json = "1.0"
+
+[[bin]]
+name = "veil-crypto"
+path = "src/bin/veil-crypto.rs"

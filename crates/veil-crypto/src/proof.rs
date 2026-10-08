@@ -20,6 +20,7 @@ pub struct PublicInputs {
     pub bid_commitment: Commitment,
     pub funding_commitment: Commitment,
     pub bid_tag: BidTag,
+    #[serde(with = "crate::hexutil::hex32_serde")]
     pub note_commitment: [u8; 32],
     pub minimum_bid: u64,
     pub bond_requirement: u64,
@@ -28,7 +29,8 @@ pub struct PublicInputs {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EligibilityProof {
     pub public: PublicInputs,
-    range_proof: Vec<u8>,
+    #[serde(with = "crate::hexutil::hex_vec_serde")]
+    pub range_proof: Vec<u8>,
 }
 
 /// Private bidder material. Never sent to Veil.
