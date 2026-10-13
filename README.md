@@ -8,12 +8,13 @@ This repository is the Zecathon V1 implementation of that protocol. Cryptography
 
 ## Current milestone
 
-1. `crates/veil-crypto` — hidden bids, toy eligibility, and a nullifier accumulator.
+1. `crates/veil-crypto` — hidden bids, Orchard notes, Halo 2 eligibility, and a nullifier accumulator.
 2. `crates/veil-mpc` — 2-of-3 Shamir shares and private argmax (winner id only).
 3. `apps/api` — close, reconfirm, private winner selection, settlement window, default / next winner.
 4. `apps/web` — sealed-bid marketplace (list lots, bid privately, seller close/settle).
 5. Zcash settlement — txids are verified on **testnet** (CipherScan) by default, or on a local `zcashd` if `ZCASH_RPC_URL` is up (`./scripts/zcash-regtest.sh`).
 6. Unified Addresses — seller and Zodl-linked addresses must include an Orchard receiver (`veil-crypto address`).
+7. Orchard + Halo 2 — funding notes are real Orchard notes; eligibility ranges are a Halo 2 proof. Merkle membership of `cmx` in the chain tree is still outstanding.
 
 ```bash
 source "$HOME/.cargo/env"
@@ -28,8 +29,6 @@ cd apps/web && npm install && npm run dev
 ```
 
 Open `http://127.0.0.1:3000`. Browse lots, list an item, and place a sealed bid. Amounts stay on the bidder’s device; the coordinator only stores tags, commitments, and status.
-
-Toy notes and Bulletproofs stand in for Orchard + Halo 2.
 
 ## Layout
 

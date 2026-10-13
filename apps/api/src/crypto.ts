@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -5,13 +6,24 @@ import type { ArgmaxBid } from "./mpc-types.ts";
 import type { BidShare, EligibilityProof } from "./types.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const targetDir = process.env.CARGO_TARGET_DIR ?? path.join(repoRoot, "target");
+
+function firstBin(name: string) {
+  const explicit = process.env[name === "veil-crypto" ? "VEIL_CRYPTO_BIN" : "VEIL_MPC_BIN"];
+  if (explicit) {
+    return explicit;
+  }
+  const release = path.join(targetDir, "release", name);
+  const debug = path.join(targetDir, "debug", name);
+  return existsSync(release) ? release : debug;
+}
 
 export function cryptoBin(): string {
-  return process.env.VEIL_CRYPTO_BIN ?? path.join(repoRoot, "target", "debug", "veil-crypto");
+  return firstBin("veil-crypto");
 }
 
 export function mpcBin(): string {
-  return process.env.VEIL_MPC_BIN ?? path.join(repoRoot, "target", "debug", "veil-mpc");
+  return firstBin("veil-mpc");
 }
 
 export async function verifyProof(proof: EligibilityProof): Promise<{ valid: boolean; error?: string }> {
@@ -72,7 +84,7 @@ export async function classifyZcashAddress(address: string): Promise<{
   const result = await runBin(cryptoBin(), ["address"], JSON.stringify({ address }));
   const body = result.stdout.trim() ? JSON.parse(result.stdout) : {};
   if (result.exitCode !== 0 || body.error) {
-    throw new Error(body.error ?? result.stderr.trim() || "invalid Zcash address");
+    throw new Error(body.error ?? (result.stderr.trim() || "invalid Zcash address"));
   }
   return body;
 }
@@ -91,7 +103,14 @@ function runBin(bin: string, args: string[], stdin: string): Promise<{
   stderr: string;
 }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(bin, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        VEIL_HALO2_DIR: targetDir,
+        CARGO_TARGET_DIR: targetDir,
+      },
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {

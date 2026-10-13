@@ -26,16 +26,16 @@ Public: `auction_id`, `C_bid`, `C_funding`, `bid_tag`, `anchor`, `nullifier_root
 
 Private: note, value, `rho`, `nk`, bid, nonces.
 
-The circuit / toy proof must show:
+The circuit must show:
 
-1. Valid note and membership (toy: note commitment)
-2. Ownership of spending secrets (toy: tag PRF key)
+1. Valid Orchard note (`cmx` from `orchard::Note`)
+2. Ownership of spending secrets (tag PRF over local seed material)
 3. `funding >= bid`
 4. `bid >= minimum`
-5. Commitment opens to the hidden bid
+5. Commitment opens to the hidden bid (Pedersen; Halo 2 binds ranges to the public statement)
 6. Tag = PRF(nk, "VEIL-BID" || rho || auction_id)
 7. Fixed public bond condition
-8. Hidden toy nullifier is not in the published accumulator (interval + Merkle paths; adjacent public leaves are a V1 leak)
+8. Hidden Veil application nullifier is not in the published accumulator (interval + Merkle paths; adjacent public leaves are a V1 leak). The real Zcash nf is never stored.
 
 ## Auction flow
 
@@ -45,7 +45,7 @@ First-price. Fixed bond (independent of bid). Close-time re-eligibility against 
 
 ## Crypto crate (now)
 
-`veil-crypto` implements domain-separated Pedersen commitments, HMAC bid tags, a toy note, and Bulletproofs range proofs for `bid - min` and `funding - bid`.
+`veil-crypto` implements domain-separated Pedersen commitments, HMAC bid tags, Orchard funding notes, and a Halo 2 eligibility circuit for `bid >= min`, `funding >= bid`, `funding >= bond`, and the nullifier interval.
 
 Settlement (now): the coordinator looks up the submitted txid on a Zcash node or testnet explorer. The lot is SETTLED only if the tx is confirmed and shielded (Orchard or Sapling). Amounts are not stored.
 
@@ -53,4 +53,4 @@ Wallet (Zodl): Veil does not inject `window.ethereum` and does not hold keys. Co
 
 Addresses: seller and linked Zodl addresses must parse as ZIP-316 Unified Addresses with an Orchard receiver (`veil-crypto address`). Transparent-only addresses are rejected.
 
-Next: replace the toy note with Orchard witnesses and Halo 2 via the mobile/lightwalletd stack.
+Next: Orchard Merkle membership (note witness from lightwalletd) so `cmx` is proven in the commitment tree, not only constructed locally.

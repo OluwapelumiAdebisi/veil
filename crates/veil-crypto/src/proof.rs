@@ -1,21 +1,13 @@
-use bulletproofs::{BulletproofGens, RangeProof};
-use curve25519_dalek_ng::scalar::Scalar;
-use merlin::Transcript;
 use serde::{Deserialize, Serialize};
 
 use crate::accumulator::{
     verify_non_membership_root, NonMembershipWitness, NullifierAccumulator,
 };
-use crate::commit::{
-    bid_commitment, commit, domain_blinding, funding_commitment, pedersen_gens, Commitment,
-    DOMAIN_BID, DOMAIN_FUNDING, DOMAIN_NF, NONCE_LEN,
-};
+use crate::circuit::{prove_eligibility, statement_fp, verify_eligibility};
+use crate::commit::{bid_commitment, commit, funding_commitment, Commitment, DOMAIN_NF, NONCE_LEN};
 use crate::error::VeilCryptoError;
-use crate::note::ToyNote;
+use crate::note::FundingNote;
 use crate::tag::{derive_bid_tag, BidTag};
-
-const RANGE_BITS: usize = 64;
-const RANGE_VALUES: usize = 4;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PublicInputs {
@@ -47,7 +39,7 @@ pub struct EligibilityProof {
 /// Private bidder material. Never sent to Veil.
 #[derive(Clone, Debug)]
 pub struct BidWitness {
-    pub note: ToyNote,
+    pub note: FundingNote,
     pub bid_amount: u64,
     pub bid_nonce: [u8; NONCE_LEN],
     pub funding_nonce: [u8; NONCE_LEN],
@@ -56,7 +48,7 @@ pub struct BidWitness {
 }
 
 pub fn create_bid_witness(
-    note: ToyNote,
+    note: FundingNote,
     auction_id: &str,
     bid_amount: u64,
     bid_nonce: [u8; NONCE_LEN],
@@ -79,7 +71,7 @@ pub fn create_bid_witness(
 
 #[allow(clippy::too_many_arguments)]
 pub fn create_bid_witness_for(
-    note: ToyNote,
+    note: FundingNote,
     auction_id: &str,
     bid_amount: u64,
     bid_nonce: [u8; NONCE_LEN],
@@ -99,13 +91,13 @@ pub fn create_bid_witness_for(
         return Err(VeilCryptoError::BondRequirement);
     }
 
-    let nf = note.toy_nullifier();
+    let nf = note.toy_nullifier()?;
     let non_membership = accumulator.prove_non_membership(nf)?;
     let bid_c = bid_commitment(auction_id, bid_amount, &bid_nonce);
     let funding_c = funding_commitment(auction_id, note.value, &funding_nonce);
     let nf_c = commit(DOMAIN_NF, auction_id, nf, &nf_nonce);
     let bid_tag = derive_bid_tag(&note.nk, &note.rho, auction_id);
-    let note_commitment = note.commitment();
+    let note_commitment = note.commitment()?;
 
     let public = PublicInputs {
         auction_id: auction_id.to_string(),
@@ -121,14 +113,15 @@ pub fn create_bid_witness_for(
         bond_requirement,
     };
 
-    let range_proof = prove_ranges(
-        &public,
+    let range_proof = prove_eligibility(
+        statement_digest(&public),
+        public.minimum_bid,
+        public.bond_requirement,
+        public.interval_left,
+        public.interval_right,
         bid_amount,
         note.value,
         nf,
-        &bid_nonce,
-        &funding_nonce,
-        &nf_nonce,
     )?;
     let proof = EligibilityProof {
         public: public.clone(),
@@ -157,118 +150,45 @@ pub fn verify_eligibility_proof(proof: &EligibilityProof) -> Result<(), VeilCryp
         return Err(VeilCryptoError::InvalidAccumulator);
     }
     verify_non_membership_root(&public.nullifier_root, &proof.non_membership)?;
-
-    let gens = pedersen_gens();
-    let c_bid = public
+    if public
         .bid_commitment
         .point()
         .decompress()
-        .ok_or(VeilCryptoError::MalformedProof)?;
-    let c_funding = public
-        .funding_commitment
-        .point()
-        .decompress()
-        .ok_or(VeilCryptoError::MalformedProof)?;
-    let c_nf = public
-        .nf_commitment
-        .point()
-        .decompress()
-        .ok_or(VeilCryptoError::MalformedProof)?;
-
-    let c_bid_minus_min = c_bid - (gens.B * Scalar::from(public.minimum_bid));
-    let c_funding_minus_bid = c_funding - c_bid;
-    let left_plus_one = public
-        .interval_left
-        .checked_add(1)
-        .ok_or(VeilCryptoError::InvalidAccumulator)?;
-    let right_minus_one = public
-        .interval_right
-        .checked_sub(1)
-        .ok_or(VeilCryptoError::InvalidAccumulator)?;
-    let c_nf_gap_left = c_nf - (gens.B * Scalar::from(left_plus_one));
-    let c_nf_gap_right = (gens.B * Scalar::from(right_minus_one)) - c_nf;
-
-    let range_proof =
-        RangeProof::from_bytes(&proof.range_proof).map_err(|_| VeilCryptoError::MalformedProof)?;
-
-    let bp_gens = BulletproofGens::new(RANGE_BITS, RANGE_VALUES);
-    let mut transcript = statement_transcript(public);
-    let commitments = [
-        c_bid_minus_min.compress(),
-        c_funding_minus_bid.compress(),
-        c_nf_gap_left.compress(),
-        c_nf_gap_right.compress(),
-    ];
-
-    range_proof
-        .verify_multiple(
-            &bp_gens,
-            &gens,
-            &mut transcript,
-            &commitments,
-            RANGE_BITS,
-        )
-        .map_err(|_| VeilCryptoError::InvalidRangeProof)?;
-
-    Ok(())
-}
-
-fn prove_ranges(
-    public: &PublicInputs,
-    bid_amount: u64,
-    funding: u64,
-    nf: u64,
-    bid_nonce: &[u8; NONCE_LEN],
-    funding_nonce: &[u8; NONCE_LEN],
-    nf_nonce: &[u8; NONCE_LEN],
-) -> Result<Vec<u8>, VeilCryptoError> {
-    let r_bid = domain_blinding(DOMAIN_BID, &public.auction_id, bid_nonce);
-    let r_funding = domain_blinding(DOMAIN_FUNDING, &public.auction_id, funding_nonce);
-    let r_nf = domain_blinding(DOMAIN_NF, &public.auction_id, nf_nonce);
-
-    if nf <= public.interval_left || nf >= public.interval_right {
-        return Err(VeilCryptoError::InvalidAccumulator);
+        .is_none()
+        || public
+            .funding_commitment
+            .point()
+            .decompress()
+            .is_none()
+        || public.nf_commitment.point().decompress().is_none()
+    {
+        return Err(VeilCryptoError::MalformedProof);
     }
 
-    let values = [
-        bid_amount - public.minimum_bid,
-        funding - bid_amount,
-        nf - public.interval_left - 1,
-        public.interval_right - 1 - nf,
-    ];
-    let blinds = [r_bid, r_funding - r_bid, r_nf, -r_nf];
-
-    let bp_gens = BulletproofGens::new(RANGE_BITS, RANGE_VALUES);
-    let pc_gens = pedersen_gens();
-    let mut transcript = statement_transcript(public);
-
-    let (proof, _commitments) = RangeProof::prove_multiple(
-        &bp_gens,
-        &pc_gens,
-        &mut transcript,
-        &values[..],
-        &blinds[..],
-        RANGE_BITS,
+    verify_eligibility(
+        statement_digest(public),
+        public.minimum_bid,
+        public.bond_requirement,
+        public.interval_left,
+        public.interval_right,
+        &proof.range_proof,
     )
-    .map_err(|_| VeilCryptoError::InvalidRangeProof)?;
-
-    Ok(proof.to_bytes())
 }
 
-fn statement_transcript(public: &PublicInputs) -> Transcript {
-    let mut t = Transcript::new(b"VEIL-ELIGIBILITY-V2");
-    t.append_message(b"auction_id", public.auction_id.as_bytes());
-    t.append_message(b"bid_commitment", &public.bid_commitment.compressed);
-    t.append_message(b"funding_commitment", &public.funding_commitment.compressed);
-    t.append_message(b"bid_tag", &public.bid_tag.0);
-    t.append_message(b"note_commitment", &public.note_commitment);
-    t.append_message(b"nullifier_root", &public.nullifier_root);
-    t.append_message(b"nf_commitment", &public.nf_commitment.compressed);
-    t.append_u64(b"interval_left", public.interval_left);
-    t.append_u64(b"interval_right", public.interval_right);
-    t.append_u64(b"minimum_bid", public.minimum_bid);
-    t.append_u64(b"bond_requirement", public.bond_requirement);
-    t
+fn statement_digest(public: &PublicInputs) -> pasta_curves::pallas::Base {
+    let mut preimage = Vec::new();
+    preimage.extend_from_slice(public.auction_id.as_bytes());
+    preimage.extend_from_slice(&public.bid_commitment.compressed);
+    preimage.extend_from_slice(&public.funding_commitment.compressed);
+    preimage.extend_from_slice(&public.bid_tag.0);
+    preimage.extend_from_slice(&public.note_commitment);
+    preimage.extend_from_slice(&public.nullifier_root);
+    preimage.extend_from_slice(&public.nf_commitment.compressed);
+    preimage.extend_from_slice(&public.interval_left.to_le_bytes());
+    preimage.extend_from_slice(&public.interval_right.to_le_bytes());
+    preimage.extend_from_slice(&public.minimum_bid.to_le_bytes());
+    preimage.extend_from_slice(&public.bond_requirement.to_le_bytes());
+    statement_fp(&preimage)
 }
 
 #[cfg(test)]
@@ -278,12 +198,12 @@ mod tests {
     use crate::tag::verify_bid_tag;
     use rand::RngCore;
 
-    fn demo_note(value: u64) -> ToyNote {
+    fn demo_note(value: u64) -> FundingNote {
         let mut rho = [0u8; 32];
         let mut nk = [0u8; 32];
         rand::thread_rng().fill_bytes(&mut rho);
         rand::thread_rng().fill_bytes(&mut nk);
-        ToyNote::new(value, rho, nk)
+        FundingNote::new(value, rho, nk)
     }
 
     fn random_nonce() -> [u8; 32] {
@@ -349,7 +269,7 @@ mod tests {
     fn spent_funding_note_fails_close_time_proof() {
         let note = demo_note(50);
         let mut acc = NullifierAccumulator::default();
-        acc.insert(note.toy_nullifier()).unwrap();
+        acc.insert(note.toy_nullifier().unwrap()).unwrap();
         let err = create_bid_witness_for(
             note,
             "A123",

@@ -10,7 +10,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../
 
 function buildCrypto() {
   const targetDir = path.join(repoRoot, "target");
-  const result = spawnSync("cargo", ["build", "-p", "veil-crypto", "--bin", "veil-crypto"], {
+  const result = spawnSync("cargo", ["build", "--release", "-p", "veil-crypto", "--bin", "veil-crypto"], {
     cwd: repoRoot,
     encoding: "utf8",
     env: {

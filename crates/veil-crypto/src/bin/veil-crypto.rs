@@ -3,7 +3,7 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use veil_crypto::{
     classify_address, create_bid_witness_for, hexutil, verify_eligibility_proof, EligibilityProof,
-    NullifierAccumulator, ToyNote, NONCE_LEN,
+    FundingNote, NullifierAccumulator, NONCE_LEN,
 };
 
 #[derive(Parser)]
@@ -28,7 +28,7 @@ struct ProveRequest {
     bid_amount: u64,
     minimum_bid: u64,
     bond_requirement: u64,
-    note: ToyNote,
+    note: FundingNote,
     #[serde(default)]
     spent_nullifiers: Vec<String>,
     #[serde(default)]
@@ -54,7 +54,7 @@ struct VerifyResponse {
 
 #[derive(Deserialize)]
 struct NoteRequest {
-    note: ToyNote,
+    note: FundingNote,
 }
 
 #[derive(Deserialize)]
@@ -128,7 +128,7 @@ fn nullifier(stdin: &str) {
     let req: NoteRequest = serde_json::from_str(stdin).unwrap_or_else(|e| exit_err(&e.to_string()));
     println!(
         "{}",
-        serde_json::json!({ "nullifier": req.note.toy_nullifier().to_string() })
+        serde_json::json!({ "nullifier": req.note.toy_nullifier().unwrap_or_else(|e| exit_err(&e.to_string())).to_string() })
     );
 }
 

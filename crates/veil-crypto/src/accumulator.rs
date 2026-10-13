@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::VeilCryptoError;
-use crate::note::ToyNote;
 
 pub const SENTINEL_MIN: u64 = 0;
 pub const SENTINEL_MAX: u64 = u64::MAX;
@@ -121,27 +120,6 @@ impl NullifierAccumulator {
     }
 }
 
-impl ToyNote {
-    /// Toy application nullifier. Not a Zcash nf; never placed on a bid record.
-    pub fn toy_nullifier(&self) -> u64 {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"VEIL-TOY-NF-V1");
-        hasher.update(&self.nk);
-        hasher.update(&self.rho);
-        let hash = hasher.finalize();
-        let mut buf = [0u8; 8];
-        buf.copy_from_slice(&hash.as_bytes()[..8]);
-        let mut nf = u64::from_le_bytes(buf);
-        if nf == SENTINEL_MIN {
-            nf = 1;
-        }
-        if nf == SENTINEL_MAX {
-            nf = SENTINEL_MAX - 1;
-        }
-        nf
-    }
-}
-
 pub fn verify_non_membership_root(
     root: &[u8; 32],
     witness: &NonMembershipWitness,
@@ -232,8 +210,8 @@ mod tests {
     #[test]
     fn spent_nullifier_cannot_prove_non_membership() {
         let mut acc = NullifierAccumulator::default();
-        let note = ToyNote::new(10, [1u8; 32], [2u8; 32]);
-        let nf = note.toy_nullifier();
+        let note = crate::note::FundingNote::new(10, [1u8; 32], [2u8; 32]);
+        let nf = note.toy_nullifier().unwrap();
         acc.insert(nf).unwrap();
         assert!(matches!(
             acc.prove_non_membership(nf),
@@ -244,8 +222,8 @@ mod tests {
     #[test]
     fn empty_accumulator_allows_any_note() {
         let acc = NullifierAccumulator::default();
-        let note = ToyNote::new(10, [9u8; 32], [8u8; 32]);
-        let w = acc.prove_non_membership(note.toy_nullifier()).unwrap();
+        let note = crate::note::FundingNote::new(10, [9u8; 32], [8u8; 32]);
+        let w = acc.prove_non_membership(note.toy_nullifier().unwrap()).unwrap();
         acc.verify_non_membership(&w).unwrap();
     }
 }

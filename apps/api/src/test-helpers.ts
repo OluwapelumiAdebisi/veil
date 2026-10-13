@@ -17,8 +17,8 @@ export function buildBins() {
     CARGO_TARGET_DIR: targetDir,
   };
   for (const args of [
-    ["build", "-p", "veil-crypto", "--bin", "veil-crypto"],
-    ["build", "-p", "veil-mpc", "--bin", "veil-mpc"],
+    ["build", "--release", "-p", "veil-crypto", "--bin", "veil-crypto"],
+    ["build", "--release", "-p", "veil-mpc", "--bin", "veil-mpc"],
   ]) {
     const result = spawnSync("cargo", args, { cwd: repoRoot, encoding: "utf8", env });
     if (result.status !== 0) {

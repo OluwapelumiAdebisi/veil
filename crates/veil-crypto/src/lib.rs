@@ -1,11 +1,10 @@
-//! Veil cryptographic primitives (V1 toy model).
+//! Veil cryptographic primitives.
 //!
-//! Real Orchard/Halo 2 circuits come later. This crate proves the protocol
-//! heart: a hidden bid can be committed and shown to be funded without the
-//! verifier learning the bid amount.
+//! Orchard notes plus a Halo 2 eligibility circuit. Bid amounts stay private.
 
 pub mod accumulator;
 pub mod address;
+pub mod circuit;
 pub mod commit;
 pub mod error;
 pub mod hexutil;
@@ -20,7 +19,7 @@ pub use commit::{
     verify_funding_commitment, Commitment, DOMAIN_BID, DOMAIN_FUNDING, NONCE_LEN,
 };
 pub use error::VeilCryptoError;
-pub use note::{ToyNote, ToyNoteWitness};
+pub use note::{FundingNote, FundingNoteWitness, ToyNote, ToyNoteWitness};
 pub use proof::{
     create_bid_witness, create_bid_witness_for, verify_eligibility_proof, BidWitness,
     EligibilityProof, PublicInputs,
