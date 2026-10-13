@@ -5,6 +5,7 @@ import { createApp } from "./app.ts";
 import { proveLocal, splitBid } from "./crypto.ts";
 import type { Clock } from "./clock.ts";
 import { MemoryStore } from "./store.ts";
+import { inspectSettlementTx, type Zcash } from "./zcash.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -134,7 +135,35 @@ export async function reconfirmAll(
   }
 }
 
-export function appWithClock(now: { value: number }) {
+export const SHIELDED_TXID = "aa".repeat(32);
+
+export function mockZcash(): Zcash {
+  return {
+    async status() {
+      return { ok: true, chain: "regtest", blocks: 120, canSend: true, source: "mock" };
+    },
+    async verifyShieldedSettlement(txid: string) {
+      if (txid.startsWith("transparent")) {
+        return inspectSettlementTx({ confirmations: 1, vout: [{ n: 0 }] });
+      }
+      if (txid.startsWith("unconfirmed")) {
+        return inspectSettlementTx({ confirmations: 0, orchard: { actions: [{}] } });
+      }
+      if (!/^[0-9a-fA-F]{64}$/.test(txid)) {
+        return { ok: false, error: "txid must be a 64-character hex Zcash transaction id" };
+      }
+      return inspectSettlementTx({ confirmations: 1, orchard: { actions: [{}] } });
+    },
+    async sendShielded() {
+      return { txid: SHIELDED_TXID };
+    },
+    async orchardAddress() {
+      return "uregtest1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+    },
+  };
+}
+
+export function appWithClock(now: { value: number }, zcash: Zcash = mockZcash()) {
   const clock: Clock = { now: () => now.value };
-  return createApp(new MemoryStore(), clock);
+  return createApp(new MemoryStore(), clock, zcash);
 }

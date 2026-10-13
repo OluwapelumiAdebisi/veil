@@ -5,6 +5,7 @@ export class MemoryStore {
   bids = new Map<string, StoredBid[]>();
   tags = new Set<string>();
   observed: string[] = [];
+  usedTxids = new Set<string>();
   committee = [new Map<string, BidShare>(), new Map<string, BidShare>(), new Map<string, BidShare>()];
 
   putAuction(auction: Auction) {
@@ -57,6 +58,7 @@ export class MemoryStore {
     this.bids.clear();
     this.tags.clear();
     this.observed = [];
+    this.usedTxids.clear();
     this.committee = [new Map(), new Map(), new Map()];
   }
 }

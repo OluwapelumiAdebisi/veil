@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Mono } from "next/font/google";
+import Script from "next/script";
 import { ClientNav } from "../components/client-nav";
 import "./globals.css";
 
@@ -27,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${fraunces.variable} ${ibm.variable} antialiased`} suppressHydrationWarning>
+        <Script src="/ext-guard.js" strategy="beforeInteractive" />
         <ClientNav />
         {children}
       </body>

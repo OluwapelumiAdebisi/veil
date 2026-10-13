@@ -6,7 +6,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../../lib/api";
 import { endsIn, lotTitle, statusCopy, zec } from "../../../lib/format";
 import type { Auction, Bid, LocalEnvelope } from "../../../lib/types";
-import { freshNote, loadLocalBids, loadWallet, saveLocalBids, type Wallet } from "../../../lib/wallet";
+import { QrImg } from "../../../components/qr-img";
+import { zip321Uri, zodlSendDeepLink } from "../../../lib/zcash-uri";
+import {
+  freshNote,
+  loadLocalBids,
+  loadWallet,
+  onWalletChange,
+  saveLocalBids,
+  shortenAddress,
+  type Wallet,
+} from "../../../lib/wallet";
+import { WalletButton } from "../../../components/wallet-button";
 
 export default function AuctionPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +25,9 @@ export default function AuctionPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [envelopes, setEnvelopes] = useState<LocalEnvelope[]>([]);
   const [amount, setAmount] = useState(5);
+  const [txid, setTxid] = useState("");
+  const [zcashOk, setZcashOk] = useState(false);
+  const [zcashMeta, setZcashMeta] = useState({ chain: "", canSend: false });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -21,7 +35,8 @@ export default function AuctionPage() {
     () => envelopes.filter((e) => e.auctionId === id),
     [envelopes, id],
   );
-  const isSeller = wallet && auction && auction.seller === wallet.sellerId;
+  const isSeller = Boolean(wallet?.connected && auction && auction.seller === wallet.address);
+  const isWinner = Boolean(wallet?.connected && mine.some((e) => e.bidId === auction?.winnerBidId));
 
   const refresh = useCallback(async () => {
     const next = await api<Auction>(`/auctions/${id}`);
@@ -39,7 +54,15 @@ export default function AuctionPage() {
   useEffect(() => {
     setWallet(loadWallet());
     setEnvelopes(loadLocalBids());
+    const stop = onWalletChange(() => setWallet(loadWallet()));
+    void api<{ ok: boolean; chain?: string; canSend?: boolean; error?: string }>("/zcash/status")
+      .then((s) => {
+        setZcashOk(s.ok);
+        setZcashMeta({ chain: s.chain ?? "", canSend: Boolean(s.canSend) });
+      })
+      .catch(() => setZcashOk(false));
     void refresh().catch((err) => setNotice(err instanceof Error ? err.message : "not found"));
+    return stop;
   }, [refresh]);
 
   async function run(label: string, fn: () => Promise<void>) {
@@ -55,7 +78,10 @@ export default function AuctionPage() {
   }
 
   async function placeBid() {
-    if (!auction || !wallet) return;
+    if (!auction || !wallet?.connected) {
+      setNotice("Connect a Zcash wallet before bidding.");
+      return;
+    }
     await run("Sealed bid submitted. Amount stayed on this device.", async () => {
       const note = mine.length === 0 ? wallet.note : freshNote(wallet.note.value);
       const proved = await api<{ proof: { public: { bid_tag: string } }; bid_nonce: string }>(
@@ -145,14 +171,34 @@ export default function AuctionPage() {
     });
   }
 
-  async function settle() {
-    await run("Settlement recorded.", async () => {
+  async function settleWith(txidValue: string) {
+    await run("Shielded settlement confirmed on Zcash.", async () => {
       await api(`/auctions/${id}/settle`, {
         method: "POST",
-        body: JSON.stringify({ txid: `shielded-${Date.now()}` }),
+        body: JSON.stringify({ txid: txidValue }),
       });
       await refresh();
     });
+  }
+
+  function paymentUri() {
+    const envelope = mine.find((e) => e.bidId === auction?.winnerBidId);
+    if (!auction || !envelope) return "";
+    return zip321Uri(auction.seller, envelope.amount, `veil:${auction.auctionId}`);
+  }
+
+  async function copyPayment() {
+    const uri = paymentUri();
+    if (!uri) {
+      setNotice("Only the winning wallet can build this payment.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(uri);
+      setNotice("ZIP-321 request copied. Scan the QR in Zodl, then paste the txid.");
+    } catch {
+      setNotice("Copy failed. Scan the QR in Zodl instead.");
+    }
   }
 
   async function defaultWinner() {
@@ -208,8 +254,18 @@ export default function AuctionPage() {
             <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
               <h2 className="font-[family-name:var(--font-fraunces)] text-xl">Place a sealed bid</h2>
               <p className="mt-2 text-xs text-[var(--muted)]">
-                Your amount is proven locally. Veil only stores a commitment.
+                Bid from your connected Zcash wallet. The amount never leaves this device.
               </p>
+              {wallet?.connected ? (
+                <p className="mt-3 truncate text-xs text-[var(--gold)]">
+                  Linked {shortenAddress(wallet.address)} · pay from this Zodl wallet if you win
+                </p>
+              ) : (
+                <div className="mt-4">
+                  <WalletButton />
+                  <p className="mt-2 text-xs text-[var(--muted)]">Connect Zodl to bid.</p>
+                </div>
+              )}
               <label className="mt-4 block text-xs text-[var(--muted)]">
                 Your bid (ZEC)
                 <input
@@ -217,11 +273,12 @@ export default function AuctionPage() {
                   min={auction.minimumBid}
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
-                  className="mt-1 w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2"
+                  disabled={!wallet?.connected}
+                  className="mt-1 w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 disabled:opacity-40"
                 />
               </label>
               <button
-                disabled={busy}
+                disabled={busy || !wallet?.connected}
                 onClick={placeBid}
                 className="mt-4 w-full rounded-full bg-[var(--gold)] px-4 py-2 text-sm text-black disabled:opacity-40"
               >
@@ -255,10 +312,48 @@ export default function AuctionPage() {
             </div>
           )}
 
+          {auction.status === "SETTLEMENT_WINDOW" && (
+            <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
+              <h2 className="font-[family-name:var(--font-fraunces)] text-xl">Settle on Zcash</h2>
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                {zcashOk
+                  ? "Scan this ZIP-321 request in Zodl. Veil only checks that the tx is shielded and confirmed."
+                  : "Cannot reach Zcash testnet. You can still pay in Zodl, then paste the txid."}
+              </p>
+              {isWinner && paymentUri() && (
+                <div className="mt-4 flex flex-col items-center gap-3">
+                  <QrImg value={paymentUri()} />
+                  <a href={zodlSendDeepLink(auction.seller, mine.find((e) => e.bidId === auction.winnerBidId)?.amount ?? 0)} className="text-xs text-[var(--gold)]">
+                    Open Zodl Send
+                  </a>
+                  <button onClick={() => void copyPayment()} className="text-xs text-[var(--muted)]">
+                    Copy payment request
+                  </button>
+                </div>
+              )}
+              <label className="mt-4 block text-xs text-[var(--muted)]">
+                Shielded txid
+                <input
+                  value={txid}
+                  onChange={(e) => setTxid(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 font-mono"
+                  placeholder="64-character hex"
+                />
+              </label>
+              <button
+                disabled={busy || !txid}
+                onClick={() => void settleWith(txid)}
+                className="mt-3 w-full rounded-md border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40"
+              >
+                Confirm on chain
+              </button>
+            </div>
+          )}
+
           {isSeller && (
             <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
               <h2 className="font-[family-name:var(--font-fraunces)] text-xl">Seller tools</h2>
-              <p className="mt-2 text-xs text-[var(--muted)]">Close the lot, then settle with the winner.</p>
+              <p className="mt-2 text-xs text-[var(--muted)]">Close the lot, then wait for shielded payment.</p>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <Action disabled={busy || auction.status !== "OPEN"} onClick={closeAuction} label="Close bidding" />
                 <Action
@@ -266,7 +361,6 @@ export default function AuctionPage() {
                   onClick={selectWinner}
                   label="Select winner"
                 />
-                <Action disabled={busy || auction.status !== "SETTLEMENT_WINDOW"} onClick={settle} label="Mark settled" />
                 <Action
                   disabled={busy || auction.status !== "SETTLEMENT_WINDOW"}
                   onClick={defaultWinner}

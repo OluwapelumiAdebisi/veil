@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { WalletButton } from "./wallet-button";
 
 export function Nav() {
   return (
@@ -15,6 +16,7 @@ export function Nav() {
           <Link href="/sell" className="text-[var(--muted)] hover:text-[var(--foreground)]">
             List an item
           </Link>
+          <WalletButton />
         </nav>
       </div>
     </header>

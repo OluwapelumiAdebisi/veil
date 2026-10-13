@@ -6,12 +6,57 @@ import { MemoryStore } from "./store.ts";
 import { accumulatorRoot, argmaxBids, proveLocal, splitBid, verifyProof } from "./crypto.ts";
 import type { BidShare, CreateAuctionBody, EligibilityProof } from "./types.ts";
 import { systemClock, type Clock } from "./clock.ts";
+import { zcashFromEnv, type Zcash } from "./zcash.ts";
 
-export function createApp(store = new MemoryStore(), clock: Clock = systemClock) {
+export function createApp(
+  store = new MemoryStore(),
+  clock: Clock = systemClock,
+  zcash: Zcash = zcashFromEnv(),
+) {
   const app = new Hono();
   app.use("*", cors());
 
+  app.get("/", (c) =>
+    c.json({
+      name: "Veil coordinator",
+      web: "http://127.0.0.1:3000",
+      health: "/health",
+      zcash: "/zcash/status",
+    }),
+  );
+
   app.get("/health", (c) => c.json({ ok: true }));
+
+  app.get("/zcash/status", async (c) => c.json(await zcash.status()));
+
+  app.get("/zcash/regtest/address", async (c) => {
+    try {
+      return c.json({ address: await zcash.orchardAddress() });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : "zcash address failed" }, 503);
+    }
+  });
+
+  app.post("/zcash/regtest/pay", async (c) => {
+    const body = await readJson(c);
+    if (!body.ok) {
+      return body.response;
+    }
+    const forbidden = findForbiddenKeys(body.value);
+    if (forbidden.length) {
+      return c.json({ error: "forbidden fields", fields: forbidden }, 400);
+    }
+    const input = body.value as { to?: string; amount?: number };
+    if (!input.to || input.amount == null) {
+      return c.json({ error: "to and amount are required" }, 400);
+    }
+    try {
+      const paid = await zcash.sendShielded({ to: input.to, amount: input.amount });
+      return c.json(paid);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : "zcash pay failed" }, 503);
+    }
+  });
 
   app.post("/demo/reset", (c) => {
     store.reset();
@@ -299,6 +344,14 @@ export function createApp(store = new MemoryStore(), clock: Clock = systemClock)
     if (!txid) {
       return c.json({ error: "txid is required" }, 400);
     }
+    const verified = await zcash.verifyShieldedSettlement(txid);
+    if (!verified.ok) {
+      return c.json({ error: verified.error }, 400);
+    }
+    if (store.usedTxids.has(txid.toLowerCase())) {
+      return c.json({ error: "settlement txid already used" }, 409);
+    }
+    store.usedTxids.add(txid.toLowerCase());
     auction.settlementTxid = txid;
     auction.status = "SETTLED";
     return c.json({

@@ -1,0 +1,24 @@
+services:
+  zcashd:
+    image: electriccoinco/zcashd:v6.10.0
+    platform: linux/amd64
+    container_name: veil-zcashd-regtest
+    ports:
+      - "18232:18232"
+    environment:
+      ZCASHD_NETWORK: regtest
+      ZCASHD_RPCUSER: veil
+      ZCASHD_RPCPASSWORD: veil-regtest
+      ZCASHD_RPCBIND: 0.0.0.0
+      ZCASHD_ALLOWIP: 0.0.0.0/0
+      ZCASHD_TXINDEX: "1"
+      ZCASHD_EXPERIMENTALFEATURES: "1"
+    volumes:
+      - ./zcash-data:/srv/zcashd/.zcash
+      - ./zcash-params:/srv/zcashd/.zcash-params
+      - ./zcashd/zcash.conf:/srv/zcashd/.zcash/zcash.conf
+    command:
+      - -regtest
+      - -rpcport=18232
+      - -nuparams=c2d6d0b4:1
+      - -nuparams=c8e71055:1

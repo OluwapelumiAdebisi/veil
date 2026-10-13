@@ -47,4 +47,8 @@ First-price. Fixed bond (independent of bid). Close-time re-eligibility against 
 
 `veil-crypto` implements domain-separated Pedersen commitments, HMAC bid tags, a toy note, and Bulletproofs range proofs for `bid - min` and `funding - bid`.
 
-Next: replace the toy note with Orchard witnesses and Halo 2.
+Settlement (now): the coordinator looks up the submitted txid on a Zcash node or testnet explorer. The lot is SETTLED only if the tx is confirmed and shielded (Orchard or Sapling). Amounts are not stored.
+
+Wallet (Zodl): Veil does not inject `window.ethereum` and does not hold keys. Connect is a Unified Address from Zodl Receive (QR scan). Settlement is a ZIP-321 payment request the winner scans in Zodl, then Veil verifies the txid. Encrypted memo carries the auction id. Follow the Zcash Payment API path (shielded z-addrs / UAs), not the Bitcoin-compatible t-addr path.
+
+Next: replace the toy note with Orchard witnesses and Halo 2 via the mobile/lightwalletd stack.

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  SHIELDED_TXID,
   appWithClock,
   buildBins,
   json,
@@ -24,14 +25,29 @@ test("winner settles inside the window without revealing the bid", async () => {
   assert.equal(winner.body.winnerBidId, bob.bidId);
   assert.equal(winner.body.status, "SETTLEMENT_WINDOW");
 
-  const settled = await json(app, "/auctions/A123/settle", {
+  const transparent = await json(app, "/auctions/A123/settle", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ txid: "transparent-payment" }),
+  });
+  assert.equal(transparent.status, 400);
+  assert.match(String(transparent.body.error), /not shielded|txid/i);
+
+  const fake = await json(app, "/auctions/A123/settle", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ txid: "shielded-tx-bob" }),
   });
+  assert.equal(fake.status, 400);
+
+  const settled = await json(app, "/auctions/A123/settle", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ txid: SHIELDED_TXID }),
+  });
   assert.equal(settled.status, 200);
   assert.equal(settled.body.status, "SETTLED");
-  assert.equal(settled.body.settlementTxid, "shielded-tx-bob");
+  assert.equal(settled.body.settlementTxid, SHIELDED_TXID);
   assert.equal(JSON.stringify(settled.body).includes("7000000"), false);
 });
 
@@ -67,7 +83,7 @@ test("expired window forfeits the bond and reruns argmax", async () => {
   const settled = await json(app, "/auctions/A123/settle", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ txid: "shielded-tx-charlie" }),
+    body: JSON.stringify({ txid: "bb".repeat(32) }),
   });
   assert.equal(settled.body.status, "SETTLED");
   assert.equal(settled.body.winnerBidId, charlie.bidId);

@@ -11,3 +11,5 @@ dist/
 .next/
 coverage/
 *.log
+infrastructure/zcash-data/
+infrastructure/zcash-params/

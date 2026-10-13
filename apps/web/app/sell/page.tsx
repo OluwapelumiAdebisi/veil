@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { WalletButton } from "../../components/wallet-button";
 import { api } from "../../lib/api";
 import type { Auction } from "../../lib/types";
-import { loadWallet } from "../../lib/wallet";
+import { loadWallet, onWalletChange, type Wallet } from "../../lib/wallet";
 
 export default function SellPage() {
   const router = useRouter();
@@ -15,17 +16,27 @@ export default function SellPage() {
   const [hours, setHours] = useState(24);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+
+  useEffect(() => {
+    const sync = () => setWallet(loadWallet());
+    sync();
+    return onWalletChange(sync);
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      const wallet = loadWallet();
+      const connected = loadWallet();
+      if (!connected.connected) {
+        throw new Error("Connect a Zcash wallet to list an item.");
+      }
       const created = await api<Auction>("/auctions", {
         method: "POST",
         body: JSON.stringify({
-          seller: wallet.sellerId,
+          seller: connected.address,
           title,
           description,
           minimumBid,
@@ -46,8 +57,14 @@ export default function SellPage() {
     <main className="mx-auto max-w-xl px-6 py-12">
       <h1 className="font-[family-name:var(--font-fraunces)] text-4xl tracking-tight">List an item</h1>
       <p className="mt-3 text-sm text-[var(--muted)]">
-        Public listing only. Bid amounts never touch Veil.
+        List from your Zcash wallet. Settlement pays this address. Bid amounts never touch Veil.
       </p>
+      <div className="mt-6">
+        <WalletButton />
+        {wallet?.connected && (
+          <p className="mt-2 break-all text-xs text-[var(--muted)]">Seller {wallet.address}</p>
+        )}
+      </div>
       <form onSubmit={onSubmit} className="mt-8 space-y-5">
         <Field label="Title">
           <input
@@ -98,10 +115,10 @@ export default function SellPage() {
         </div>
         {error && <p className="text-sm text-[var(--gold)]">{error}</p>}
         <button
-          disabled={busy}
+          disabled={busy || !wallet?.connected}
           className="rounded-full bg-[var(--gold)] px-6 py-2 text-sm text-black disabled:opacity-40"
         >
-          {busy ? "Publishing…" : "Publish listing"}
+          {busy ? "Publishing…" : wallet?.connected ? "Publish listing" : "Connect wallet to list"}
         </button>
       </form>
     </main>
