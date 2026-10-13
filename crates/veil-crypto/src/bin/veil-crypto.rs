@@ -2,8 +2,8 @@ use clap::{Parser, Subcommand};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use veil_crypto::{
-    create_bid_witness_for, hexutil, verify_eligibility_proof, EligibilityProof, NullifierAccumulator,
-    ToyNote, NONCE_LEN,
+    classify_address, create_bid_witness_for, hexutil, verify_eligibility_proof, EligibilityProof,
+    NullifierAccumulator, ToyNote, NONCE_LEN,
 };
 
 #[derive(Parser)]
@@ -19,6 +19,7 @@ enum Command {
     Verify,
     Nullifier,
     AccRoot,
+    Address,
 }
 
 #[derive(Deserialize)]
@@ -70,6 +71,7 @@ fn main() {
         Command::Verify => verify(&stdin),
         Command::Nullifier => nullifier(&stdin),
         Command::AccRoot => acc_root(&stdin),
+        Command::Address => classify(&stdin),
     }
 }
 
@@ -140,6 +142,21 @@ fn acc_root(stdin: &str) {
         "{}",
         serde_json::json!({ "root": hex::encode(acc.root()), "nullifiers": observed })
     );
+}
+
+fn classify(stdin: &str) {
+    let req: serde_json::Value = serde_json::from_str(stdin).unwrap_or_else(|e| exit_err(&e.to_string()));
+    let address = req
+        .get("address")
+        .and_then(|v| v.as_str())
+        .unwrap_or_else(|| exit_err("address is required"));
+    match classify_address(address) {
+        Ok(info) => println!("{}", serde_json::to_string(&info).expect("json")),
+        Err(e) => {
+            println!("{}", serde_json::json!({ "error": e.to_string() }));
+            std::process::exit(2);
+        }
+    }
 }
 
 fn parse_u64s(values: &[String]) -> Vec<u64> {

@@ -5,6 +5,7 @@
 //! verifier learning the bid amount.
 
 pub mod accumulator;
+pub mod address;
 pub mod commit;
 pub mod error;
 pub mod hexutil;
@@ -12,6 +13,7 @@ pub mod note;
 pub mod proof;
 pub mod tag;
 
+pub use address::{classify_address, AddressInfo};
 pub use accumulator::{NonMembershipWitness, NullifierAccumulator};
 pub use commit::{
     bid_blinding, bid_commitment, funding_commitment, pedersen_gens, verify_bid_commitment,

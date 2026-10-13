@@ -62,6 +62,21 @@ export async function splitBid(auctionId: string, bidAmount: number, bidNonce: s
   return JSON.parse(result.stdout) as BidShare[];
 }
 
+export async function classifyZcashAddress(address: string): Promise<{
+  network: string;
+  kind: string;
+  has_orchard: boolean;
+  has_sapling: boolean;
+  shielded: boolean;
+}> {
+  const result = await runBin(cryptoBin(), ["address"], JSON.stringify({ address }));
+  const body = result.stdout.trim() ? JSON.parse(result.stdout) : {};
+  if (result.exitCode !== 0 || body.error) {
+    throw new Error(body.error ?? result.stderr.trim() || "invalid Zcash address");
+  }
+  return body;
+}
+
 export async function argmaxBids(bids: ArgmaxBid[]): Promise<{ winner_bid_id: string }> {
   const result = await runBin(mpcBin(), ["argmax"], JSON.stringify({ bids }));
   if (result.exitCode !== 0) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { api } from "../lib/api";
 import { zodlReceiveDeepLink } from "../lib/zcash-uri";
 import {
   connectWallet,
@@ -54,19 +55,23 @@ function WalletModal({ wallet, onClose }: { wallet: Wallet; onClose: () => void 
   const [error, setError] = useState("");
 
   const accept = useCallback(
-    (address: string) => {
-      connectWallet(address, "zodl");
-      onClose();
+    async (address: string) => {
+      try {
+        await api("/zcash/address", {
+          method: "POST",
+          body: JSON.stringify({ address }),
+        });
+        connectWallet(address, "zodl");
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Need an Orchard Unified Address from Zodl.");
+      }
     },
     [onClose],
   );
 
   function connectPasted() {
-    if (!isZcashAddress(paste)) {
-      setError("That doesn’t look like a Zcash Unified Address.");
-      return;
-    }
-    accept(paste);
+    void accept(paste);
   }
 
   return (

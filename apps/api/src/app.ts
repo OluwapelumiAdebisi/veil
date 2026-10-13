@@ -3,7 +3,7 @@ import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { findForbiddenKeys } from "./invariant.ts";
 import { MemoryStore } from "./store.ts";
-import { accumulatorRoot, argmaxBids, proveLocal, splitBid, verifyProof } from "./crypto.ts";
+import { accumulatorRoot, argmaxBids, classifyZcashAddress, proveLocal, splitBid, verifyProof } from "./crypto.ts";
 import type { BidShare, CreateAuctionBody, EligibilityProof } from "./types.ts";
 import { systemClock, type Clock } from "./clock.ts";
 import { zcashFromEnv, type Zcash } from "./zcash.ts";
@@ -28,6 +28,22 @@ export function createApp(
   app.get("/health", (c) => c.json({ ok: true }));
 
   app.get("/zcash/status", async (c) => c.json(await zcash.status()));
+
+  app.post("/zcash/address", async (c) => {
+    const body = await readJson(c);
+    if (!body.ok) {
+      return body.response;
+    }
+    const address = (body.value as { address?: string }).address;
+    if (!address) {
+      return c.json({ error: "address is required" }, 400);
+    }
+    try {
+      return c.json(await classifyZcashAddress(address));
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : "invalid address" }, 400);
+    }
+  });
 
   app.get("/zcash/regtest/address", async (c) => {
     try {
@@ -135,6 +151,16 @@ export function createApp(
     const input = body.value as CreateAuctionBody;
     if (!input.seller || input.minimumBid == null || input.bondAmount == null || !input.endTime) {
       return c.json({ error: "seller, minimumBid, bondAmount, and endTime are required" }, 400);
+    }
+    if (/^(u1|utest1|uregtest1|zs1|ztestsapling1|tm|t1|t3)/i.test(input.seller)) {
+      try {
+        await classifyZcashAddress(input.seller);
+      } catch (err) {
+        return c.json(
+          { error: err instanceof Error ? err.message : "seller must be an Orchard Unified Address" },
+          400,
+        );
+      }
     }
     const auctionId = input.auctionId ?? crypto.randomUUID();
     if (store.getAuction(auctionId)) {

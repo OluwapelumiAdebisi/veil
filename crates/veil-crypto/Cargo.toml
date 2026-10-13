@@ -18,6 +18,8 @@ serde_json = { workspace = true }
 hex = { workspace = true }
 clap = { workspace = true }
 rand = { workspace = true }
+zcash_address = "0.12"
+zcash_protocol = "0.9"
 
 [[bin]]
 name = "veil-crypto"

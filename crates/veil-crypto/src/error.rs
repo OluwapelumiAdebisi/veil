@@ -26,4 +26,10 @@ pub enum VeilCryptoError {
     InsufficientShares,
     #[error("share does not match the bid commitment")]
     InconsistentShares,
+    #[error("not a Zcash address")]
+    InvalidAddress,
+    #[error("transparent-only addresses are not allowed")]
+    TransparentAddress,
+    #[error("address has no Orchard receiver")]
+    MissingOrchard,
 }

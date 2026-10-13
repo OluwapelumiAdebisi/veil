@@ -4,7 +4,7 @@ import jsQR from "jsqr";
 import { useEffect, useRef, useState } from "react";
 import { parseZcashPayload } from "../lib/zcash-uri";
 
-export function QrScan({ onAddress }: { onAddress: (address: string) => void }) {
+export function QrScan({ onAddress }: { onAddress: (address: string) => void | Promise<void> }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState("");

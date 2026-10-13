@@ -13,6 +13,7 @@ This repository is the Zecathon V1 implementation of that protocol. Cryptography
 3. `apps/api` — close, reconfirm, private winner selection, settlement window, default / next winner.
 4. `apps/web` — sealed-bid marketplace (list lots, bid privately, seller close/settle).
 5. Zcash settlement — txids are verified on **testnet** (CipherScan) by default, or on a local `zcashd` if `ZCASH_RPC_URL` is up (`./scripts/zcash-regtest.sh`).
+6. Unified Addresses — seller and Zodl-linked addresses must include an Orchard receiver (`veil-crypto address`).
 
 ```bash
 source "$HOME/.cargo/env"

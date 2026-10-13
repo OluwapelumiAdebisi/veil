@@ -51,4 +51,6 @@ Settlement (now): the coordinator looks up the submitted txid on a Zcash node or
 
 Wallet (Zodl): Veil does not inject `window.ethereum` and does not hold keys. Connect is a Unified Address from Zodl Receive (QR scan). Settlement is a ZIP-321 payment request the winner scans in Zodl, then Veil verifies the txid. Encrypted memo carries the auction id. Follow the Zcash Payment API path (shielded z-addrs / UAs), not the Bitcoin-compatible t-addr path.
 
+Addresses: seller and linked Zodl addresses must parse as ZIP-316 Unified Addresses with an Orchard receiver (`veil-crypto address`). Transparent-only addresses are rejected.
+
 Next: replace the toy note with Orchard witnesses and Halo 2 via the mobile/lightwalletd stack.
