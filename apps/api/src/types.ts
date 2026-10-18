@@ -40,12 +40,19 @@ export type PublicInputs = {
   interval_right: string;
   minimum_bid: number;
   bond_requirement: number;
+  orchard_anchor: string;
+};
+
+export type OrchardMerklePath = {
+  position: number;
+  auth_path: string[];
 };
 
 export type EligibilityProof = {
   public: PublicInputs;
   range_proof: string;
   non_membership: NonMembershipWitness;
+  orchard_path: OrchardMerklePath;
 };
 
 export type Auction = {
@@ -66,6 +73,7 @@ export type Auction = {
   settlementDeadline?: string;
   settlementTxid?: string;
   defaultedBidIds?: string[];
+  orchardAnchor?: string;
 };
 
 export type StoredBid = {
@@ -96,4 +104,5 @@ export type CreateAuctionBody = {
   startTime?: string;
   endTime: string;
   settlementWindow?: number;
+  orchardAnchor?: string;
 };

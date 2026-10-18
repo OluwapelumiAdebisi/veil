@@ -18,6 +18,8 @@ pub enum VeilCryptoError {
     MalformedProof,
     #[error("note commitment does not match the witness")]
     InvalidNote,
+    #[error("note commitment is not in the Orchard tree")]
+    NoteNotInTree,
     #[error("nullifier was already spent")]
     NullifierSpent,
     #[error("nullifier accumulator proof is invalid")]

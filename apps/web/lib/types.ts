@@ -21,6 +21,7 @@ export type Auction = {
   settlementTxid?: string;
   defaultedBidIds?: string[];
   sealedBidCount?: number;
+  orchardAnchor?: string;
   bids?: Bid[];
 };
 

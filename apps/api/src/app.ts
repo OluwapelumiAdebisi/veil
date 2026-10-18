@@ -181,6 +181,7 @@ export function createApp(
       pricingRule: "FIRST_PRICE" as const,
       status: "OPEN" as const,
       nullifierRoot: acc.root,
+      orchardAnchor: input.orchardAnchor?.trim() || undefined,
     };
     store.putAuction(auction);
     return c.json(auction, 201);
@@ -476,7 +477,7 @@ async function acceptProof(
   if (!auction) {
     return { error: c.json({ error: "not found" }, 404) };
   }
-  if (!proof?.public || !proof.range_proof || !proof.non_membership) {
+  if (!proof?.public || !proof.range_proof || !proof.non_membership || !proof.orchard_path) {
     return { error: c.json({ error: "eligibility proof is required" }, 400) };
   }
   if (proof.public.auction_id !== auction.auctionId) {
@@ -490,6 +491,9 @@ async function acceptProof(
   }
   if (expectedRoot && proof.public.nullifier_root !== expectedRoot) {
     return { error: c.json({ error: "nullifier root mismatch" }, 400) };
+  }
+  if (auction.orchardAnchor && proof.public.orchard_anchor !== auction.orchardAnchor) {
+    return { error: c.json({ error: "orchard anchor mismatch" }, 400) };
   }
   if (checkTag && store.hasTag(auction.auctionId, proof.public.bid_tag)) {
     return { error: c.json({ error: "bid tag already used" }, 409) };

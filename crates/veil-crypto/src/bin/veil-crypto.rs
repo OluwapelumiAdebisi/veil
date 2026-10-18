@@ -3,7 +3,8 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use veil_crypto::{
     classify_address, create_bid_witness_for, hexutil, verify_eligibility_proof, EligibilityProof,
-    FundingNote, NullifierAccumulator, NONCE_LEN,
+    FundingNote, NullifierAccumulator, OrchardMembership, OrchardMerklePath, OrchardNoteTree,
+    NONCE_LEN,
 };
 
 #[derive(Parser)]
@@ -37,6 +38,10 @@ struct ProveRequest {
     funding_nonce: Option<String>,
     #[serde(default)]
     nf_nonce: Option<String>,
+    orchard_path: Option<OrchardMerklePath>,
+    orchard_anchor: Option<String>,
+    #[serde(default)]
+    extra_commitments: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -83,6 +88,7 @@ fn prove(stdin: &str) {
     let spent = parse_u64s(&req.spent_nullifiers);
     let acc = NullifierAccumulator::from_observed(&spent)
         .unwrap_or_else(|e| exit_err(&e.to_string()));
+    let membership = membership_from_request(&req).unwrap_or_else(|e| exit_err(&e.to_string()));
     let witness = create_bid_witness_for(
         req.note,
         &req.auction_id,
@@ -93,6 +99,7 @@ fn prove(stdin: &str) {
         req.minimum_bid,
         req.bond_requirement,
         &acc,
+        membership,
     )
     .unwrap_or_else(|e| exit_err(&e.to_string()));
     let body = ProveResponse {
@@ -157,6 +164,27 @@ fn classify(stdin: &str) {
             std::process::exit(2);
         }
     }
+}
+
+fn membership_from_request(req: &ProveRequest) -> Result<Option<OrchardMembership>, String> {
+    if let (Some(path), Some(anchor)) = (&req.orchard_path, req.orchard_anchor.as_deref()) {
+        let anchor = hexutil::decode32(anchor)?;
+        return Ok(Some(OrchardMembership {
+            anchor,
+            path: path.clone(),
+        }));
+    }
+    if req.extra_commitments.is_empty() {
+        return Ok(None);
+    }
+    let mut tree = OrchardNoteTree::new();
+    for cmx in &req.extra_commitments {
+        tree.append(hexutil::decode32(cmx)?).map_err(|e| e.to_string())?;
+    }
+    let position = tree
+        .append(req.note.commitment().map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    Ok(Some(tree.membership(position).map_err(|e| e.to_string())?))
 }
 
 fn parse_u64s(values: &[String]) -> Vec<u64> {

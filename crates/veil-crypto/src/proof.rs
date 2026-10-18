@@ -6,6 +6,9 @@ use crate::accumulator::{
 use crate::circuit::{prove_eligibility, statement_fp, verify_eligibility};
 use crate::commit::{bid_commitment, commit, funding_commitment, Commitment, DOMAIN_NF, NONCE_LEN};
 use crate::error::VeilCryptoError;
+use crate::merkle::{
+    verify_orchard_membership, OrchardMembership, OrchardMerklePath, OrchardNoteTree,
+};
 use crate::note::FundingNote;
 use crate::tag::{derive_bid_tag, BidTag};
 
@@ -26,6 +29,8 @@ pub struct PublicInputs {
     pub interval_right: u64,
     pub minimum_bid: u64,
     pub bond_requirement: u64,
+    #[serde(with = "crate::hexutil::hex32_serde")]
+    pub orchard_anchor: [u8; 32],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -34,6 +39,7 @@ pub struct EligibilityProof {
     #[serde(with = "crate::hexutil::hex_vec_serde")]
     pub range_proof: Vec<u8>,
     pub non_membership: NonMembershipWitness,
+    pub orchard_path: OrchardMerklePath,
 }
 
 /// Private bidder material. Never sent to Veil.
@@ -66,6 +72,7 @@ pub fn create_bid_witness(
         minimum_bid,
         bond_requirement,
         &NullifierAccumulator::default(),
+        None,
     )
 }
 
@@ -80,6 +87,7 @@ pub fn create_bid_witness_for(
     minimum_bid: u64,
     bond_requirement: u64,
     accumulator: &NullifierAccumulator,
+    membership: Option<OrchardMembership>,
 ) -> Result<BidWitness, VeilCryptoError> {
     if bid_amount < minimum_bid {
         return Err(VeilCryptoError::BidBelowMinimum);
@@ -98,6 +106,11 @@ pub fn create_bid_witness_for(
     let nf_c = commit(DOMAIN_NF, auction_id, nf, &nf_nonce);
     let bid_tag = derive_bid_tag(&note.nk, &note.rho, auction_id);
     let note_commitment = note.commitment()?;
+    let membership = match membership {
+        Some(m) => m,
+        None => OrchardNoteTree::singleton(note_commitment)?,
+    };
+    verify_orchard_membership(&note_commitment, &membership.path, &membership.anchor)?;
 
     let public = PublicInputs {
         auction_id: auction_id.to_string(),
@@ -111,6 +124,7 @@ pub fn create_bid_witness_for(
         interval_right: non_membership.right,
         minimum_bid,
         bond_requirement,
+        orchard_anchor: membership.anchor,
     };
 
     let range_proof = prove_eligibility(
@@ -127,6 +141,7 @@ pub fn create_bid_witness_for(
         public: public.clone(),
         range_proof,
         non_membership,
+        orchard_path: membership.path,
     };
 
     Ok(BidWitness {
@@ -137,6 +152,34 @@ pub fn create_bid_witness_for(
         public,
         proof,
     })
+}
+
+pub fn create_bid_witness_for_tree(
+    note: FundingNote,
+    auction_id: &str,
+    bid_amount: u64,
+    bid_nonce: [u8; NONCE_LEN],
+    funding_nonce: [u8; NONCE_LEN],
+    nf_nonce: [u8; NONCE_LEN],
+    minimum_bid: u64,
+    bond_requirement: u64,
+    accumulator: &NullifierAccumulator,
+    tree: &OrchardNoteTree,
+    position: u32,
+) -> Result<BidWitness, VeilCryptoError> {
+    let membership = tree.membership(position)?;
+    create_bid_witness_for(
+        note,
+        auction_id,
+        bid_amount,
+        bid_nonce,
+        funding_nonce,
+        nf_nonce,
+        minimum_bid,
+        bond_requirement,
+        accumulator,
+        Some(membership),
+    )
 }
 
 pub fn verify_eligibility_proof(proof: &EligibilityProof) -> Result<(), VeilCryptoError> {
@@ -150,6 +193,11 @@ pub fn verify_eligibility_proof(proof: &EligibilityProof) -> Result<(), VeilCryp
         return Err(VeilCryptoError::InvalidAccumulator);
     }
     verify_non_membership_root(&public.nullifier_root, &proof.non_membership)?;
+    verify_orchard_membership(
+        &public.note_commitment,
+        &proof.orchard_path,
+        &public.orchard_anchor,
+    )?;
     if public
         .bid_commitment
         .point()
@@ -188,6 +236,7 @@ fn statement_digest(public: &PublicInputs) -> pasta_curves::pallas::Base {
     preimage.extend_from_slice(&public.interval_right.to_le_bytes());
     preimage.extend_from_slice(&public.minimum_bid.to_le_bytes());
     preimage.extend_from_slice(&public.bond_requirement.to_le_bytes());
+    preimage.extend_from_slice(&public.orchard_anchor);
     statement_fp(&preimage)
 }
 
@@ -280,8 +329,45 @@ mod tests {
             5,
             1,
             &acc,
+            None,
         )
         .unwrap_err();
         assert!(matches!(err, VeilCryptoError::NullifierSpent));
+    }
+
+    #[test]
+    fn orchard_membership_is_required_and_binds_the_anchor() {
+        let note = demo_note(50);
+        let mut tree = OrchardNoteTree::new();
+        tree.append(
+            FundingNote::new(1, [3u8; 32], [4u8; 32])
+                .commitment()
+                .unwrap(),
+        )
+        .unwrap();
+        let position = tree.append(note.commitment().unwrap()).unwrap();
+        tree.append(
+            FundingNote::new(2, [5u8; 32], [6u8; 32])
+                .commitment()
+                .unwrap(),
+        )
+        .unwrap();
+        let mut witness = create_bid_witness_for_tree(
+            note,
+            "A123",
+            20,
+            random_nonce(),
+            random_nonce(),
+            random_nonce(),
+            5,
+            1,
+            &NullifierAccumulator::default(),
+            &tree,
+            position,
+        )
+        .unwrap();
+        verify_eligibility_proof(&witness.proof).unwrap();
+        witness.proof.public.orchard_anchor[0] ^= 1;
+        assert!(verify_eligibility_proof(&witness.proof).is_err());
     }
 }

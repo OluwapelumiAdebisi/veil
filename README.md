@@ -14,7 +14,8 @@ This repository is the Zecathon V1 implementation of that protocol. Cryptography
 4. `apps/web` — sealed-bid marketplace (list lots, bid privately, seller close/settle).
 5. Zcash settlement — txids are verified on **testnet** (CipherScan) by default, or on a local `zcashd` if `ZCASH_RPC_URL` is up (`./scripts/zcash-regtest.sh`).
 6. Unified Addresses — seller and Zodl-linked addresses must include an Orchard receiver (`veil-crypto address`).
-7. Orchard + Halo 2 — funding notes are real Orchard notes; eligibility ranges are a Halo 2 proof. Merkle membership of `cmx` in the chain tree is still outstanding.
+7. Orchard + Halo 2 — funding notes are real Orchard notes; eligibility ranges are a Halo 2 proof.
+8. Orchard Merkle membership — eligibility includes an Orchard auth path so `cmx` opens to a public `anchor` (same MerkleCRH as the chain tree). Pin `orchardAnchor` on an auction to require a shared root; otherwise the local prover builds a tree of the same hash. Live lightwalletd path fetch is still outstanding.
 
 ```bash
 source "$HOME/.cargo/env"

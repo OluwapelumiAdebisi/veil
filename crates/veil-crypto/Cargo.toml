@@ -12,6 +12,7 @@ bulletproofs = { workspace = true }
 ff = "0.13"
 halo2_proofs = { version = "0.3", default-features = false, features = ["batch", "floor-planner-v1-legacy-pdqsort"] }
 hmac = { workspace = true }
+incrementalmerkletree = "0.8.2"
 orchard = { version = "0.15.1", default-features = false, features = ["std"] }
 pasta_curves = "0.5"
 sha2 = { workspace = true }

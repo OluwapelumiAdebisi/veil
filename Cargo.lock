@@ -1323,6 +1323,7 @@ dependencies = [
  "halo2_proofs",
  "hex",
  "hmac",
+ "incrementalmerkletree",
  "orchard",
  "pasta_curves",
  "rand",

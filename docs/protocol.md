@@ -28,7 +28,7 @@ Private: note, value, `rho`, `nk`, bid, nonces.
 
 The circuit must show:
 
-1. Valid Orchard note (`cmx` from `orchard::Note`)
+1. Valid Orchard note (`cmx` from `orchard::Note`) and Merkle membership in an Orchard tree (`cmx` + auth path = public `anchor`, MerkleCRH^Orchard). A wallet/lightwalletd supplies the path against a chain anchor; V1 demo prove may use a local tree of the same hash. Auth-path position is a V1 leak.
 2. Ownership of spending secrets (tag PRF over local seed material)
 3. `funding >= bid`
 4. `bid >= minimum`
@@ -45,7 +45,7 @@ First-price. Fixed bond (independent of bid). Close-time re-eligibility against 
 
 ## Crypto crate (now)
 
-`veil-crypto` implements domain-separated Pedersen commitments, HMAC bid tags, Orchard funding notes, and a Halo 2 eligibility circuit for `bid >= min`, `funding >= bid`, `funding >= bond`, and the nullifier interval.
+`veil-crypto` implements domain-separated Pedersen commitments, HMAC bid tags, Orchard funding notes, Orchard Merkle membership (`cmx` → `anchor`), and a Halo 2 eligibility circuit for `bid >= min`, `funding >= bid`, `funding >= bond`, and the nullifier interval.
 
 Settlement (now): the coordinator looks up the submitted txid on a Zcash node or testnet explorer. The lot is SETTLED only if the tx is confirmed and shielded (Orchard or Sapling). Amounts are not stored.
 
@@ -53,4 +53,4 @@ Wallet (Zodl): Veil does not inject `window.ethereum` and does not hold keys. Co
 
 Addresses: seller and linked Zodl addresses must parse as ZIP-316 Unified Addresses with an Orchard receiver (`veil-crypto address`). Transparent-only addresses are rejected.
 
-Next: Orchard Merkle membership (note witness from lightwalletd) so `cmx` is proven in the commitment tree, not only constructed locally.
+Next: pull the Orchard auth path from lightwalletd / compact blocks so the auction `orchardAnchor` is a live chain root, not a local tree.
