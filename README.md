@@ -35,9 +35,9 @@ Open `http://127.0.0.1:3000`. Browse lots, list an item, and place a sealed bid.
 
 The Next.js UI belongs on Vercel. The coordinator (`apps/api`) spawns `veil-crypto` / `veil-mpc` and keeps auction state in memory, so it cannot run on Vercel serverless. Host the API on Fly, Railway, or Render with `infrastructure/Dockerfile.api`, then point Vercel at it.
 
-1. Import [OluwapelumiAdebisi/veil](https://github.com/OluwapelumiAdebisi/veil) in Vercel.
-2. Set **Root Directory** to `apps/web`.
-3. Framework: Next.js. Deploy once (lots will fail until the API is up).
+1. In Vercel, **Add New… → Project** (not a Service). Import [OluwapelumiAdebisi/veil](https://github.com/OluwapelumiAdebisi/veil).
+2. If the URL contains `framework=services`, cancel and start a Project import instead — or leave it: repo-root `vercel.json` now exposes `apps/web` as the Next.js service.
+3. Prefer setting **Root Directory** to `apps/web` and Framework **Next.js**. Deploy once (lots will fail until the API is up).
 4. Deploy the API from the repo root:
 
 ```bash
