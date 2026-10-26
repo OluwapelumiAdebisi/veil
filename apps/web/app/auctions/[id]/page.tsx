@@ -317,7 +317,7 @@ export default function AuctionPage() {
               <h2 className="font-[family-name:var(--font-fraunces)] text-xl">Settle on Zcash</h2>
               <p className="mt-2 text-xs text-[var(--muted)]">
                 {zcashOk
-                  ? "Scan this ZIP-321 request in Zodl. Veil only checks that the tx is shielded and confirmed."
+                  ? `Scan this ZIP-321 request in Zodl. Veil only checks that the tx is shielded and confirmed${zcashMeta.chain ? ` on ${zcashMeta.chain}` : ""}.`
                   : "Cannot reach Zcash testnet. You can still pay in Zodl, then paste the txid."}
               </p>
               {isWinner && paymentUri() && (

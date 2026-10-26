@@ -21,5 +21,7 @@ export function QrImg({ value, size = 196 }: { value: string; size?: number }) {
   if (!src) {
     return <div className="h-[196px] w-[196px] rounded-lg border border-[var(--line)]" />;
   }
+  // Data-URL QR from qrcode; next/image is not useful here.
+  // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} width={size} height={size} alt="Zcash QR" className="rounded-lg" />;
 }

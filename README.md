@@ -31,6 +31,23 @@ cd apps/web && npm install && npm run dev
 
 Open `http://127.0.0.1:3000`. Browse lots, list an item, and place a sealed bid. Amounts stay on the bidder’s device; the coordinator only stores tags, commitments, and status.
 
+## Host the marketplace on Vercel
+
+The Next.js UI belongs on Vercel. The coordinator (`apps/api`) spawns `veil-crypto` / `veil-mpc` and keeps auction state in memory, so it cannot run on Vercel serverless. Host the API on Fly, Railway, or Render with `infrastructure/Dockerfile.api`, then point Vercel at it.
+
+1. Import [OluwapelumiAdebisi/veil](https://github.com/OluwapelumiAdebisi/veil) in Vercel.
+2. Set **Root Directory** to `apps/web`.
+3. Framework: Next.js. Deploy once (lots will fail until the API is up).
+4. Deploy the API from the repo root:
+
+```bash
+docker build -f infrastructure/Dockerfile.api -t veil-api .
+```
+
+5. In the Vercel project, add `VEIL_API_ORIGIN` = `https://your-api-host` (no trailing slash). Redeploy.
+
+The browser still calls `/veil/...` on the Vercel domain. Next rewrites those requests to the coordinator. Do not set `NEXT_PUBLIC_VEIL_API` unless you want the browser to talk to the API origin directly.
+
 ## Layout
 
 ```

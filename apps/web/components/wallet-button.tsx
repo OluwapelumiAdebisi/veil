@@ -6,7 +6,6 @@ import { zodlReceiveDeepLink } from "../lib/zcash-uri";
 import {
   connectWallet,
   disconnectWallet,
-  isZcashAddress,
   loadWallet,
   onWalletChange,
   shortenAddress,
