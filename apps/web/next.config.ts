@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
-// Quick tunnels expire; a stale VEIL_API_ORIGIN on Vercel 502s the UI.
-const PUBLIC_COORDINATOR = "https://dividend-training-necessity-solve.trycloudflare.com";
+const PUBLIC_COORDINATOR = "https://veil-coordinator.fly.dev";
 
 function apiOrigin(): string {
   let raw = (process.env.VEIL_API_ORIGIN ?? "").trim().replace(/^['"]|['"]$/g, "");

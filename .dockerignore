@@ -3,3 +3,4 @@ target
 apps/web
 .git
 *.md
+.bin
